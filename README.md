@@ -1,8 +1,14 @@
 ## Table of Contents
 1. [Creation and activation of virtual environments](#creation-and-activation-of-virtual-environments)
-2. [Fast api installation](#fast-api-installation)
+2. [Fastpi rest endpoints](#fastpi-rest-endpoints)
 3. [Validation with pydantic](#validation-with-pydantic)
 4. [Rest endpoints](#rest-endpoints)
+5. [Reading environmental variables using pydantic settings](#reading-environmental-variables-using-pydantic-settings)
+6. [Database](#database)
+7. [JWT with fastapi](#jwt-with-fastapi)
+8. [Install libs through requirements.txt](#install-libs-through-requirements-txt)
+9. [app dockerization](#app-dockerization)
+10. [postgres queries examples](#postgres-queries-examples)
 
 ## 1. Creation and activation of virtual environments
 
@@ -161,7 +167,7 @@ class UserOut(BaseModel):
         from_attributes = True
 ```
 
-## 4. Rest endpoints
+## 4. Fastpi rest endpoints
 
 ### 4.1 __Get__
 
@@ -267,145 +273,282 @@ def get_posts(
     pass
 ```
 
-### 4.5 Endpoints/resources organization 
+### 4.6 Endpoints/resources organization
 
+Fastapi uses the notion of routers for structuring the code (resources).
+Routers are a combination of packages and use of APIRouter.
 
+Example:You have an app that manages users posts.
+So, you want to separate the posts code and the user code into separate
+url resources and you don't want to have all the code into a single file.
+A solution to this is a combination of packages and fastapi routers.
 
-# Alembic: to
+- Using packages for better code structure (usage of dunder init file):
 
-# differences between 
-
-
-# passlib[bcrypt]
-```python
-pip install passlib[bcrypt]
+```sh
+.
+└── app/
+    ├── routers/
+    │   ├── __init__.py
+    │   ├── post.py
+    │   └── user.py
+    ├── __init__.py
+    └── main.py
 ```
 
-# JWT token authentication
-
-1. /login (usr + pwd)
+- Router usage:
 
 ```python
-pip install python-jose[cryptography]
+from fastapi import APIRouter
+
+
+# appends to all REST urls the /posts
+router = APIRouter(prefix="/posts", tags=["Posts"])
+
+@router.get("/")
+def get_posts(...):
+    pass
+
 ```
+Similar code is implemented for the users.
 
-cascade action on FK:
-
-%20 is a single space on the url
-
-# environment vars
-
-how to access them, using fastApi:
+- Router inclusion to fast api app:
 
 ```python
-import os
-path = os.getenv("Path")
+from fastapi import FastAPI
+
+app = FastAPI()
+
+# include routes
+app.include_router(post.router)
+app.include_router(user.router)
+
 ```
 
-- environment file to the rescue!
+## 5. Reading environmental variables using pydantic settings
 
-- validate environment vars
-```python
-
-from pydantic import BaseSettings
-
-# the environment vars are actually properties if the class
-# keep in mind, that the attributes are case insensitive
-class Settings(BaseSettings):
-    database_password: str = ""
-    database_host: str = ""
-    ...
-
-settings = Settings()
-print(settings.database_password)
-...
-...
-```
-
+Lib required:
 ```cmd
 pip install pydantic-settings
 ```
 
-## left join
-```sql
-select * from posts LEFT JOIN users ON posts.user_id = users.id;
-select content, email, title from posts LEFT JOIN users ON posts.user_id = users.id;
+Example, the attributes of Settings class must match the environmental variables (is case insensitive):
 
--- where is ambiguity, use the table in front
-SELECT post.id, users.emai
-FROM posts -- the left table
-LEFT JOIN users -- the right table
-ON posts.user_id = users.id;
+```python
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    database_hostname: str
+    database_port: str
+    database_password: str
+    database_name: str
+    database_username: str
+    secret_key: str
+    algorithm: str
+    access_token_expire_minutes: int
+
+    class Config:
+        env_file = ".env"
+
+
+settings = Settings()
 ```
 
-## right join
-```sql
-select * from posts RIGHT JOIN users ON posts.user_id = users.id;
-select content, email, title from posts RIGHT JOIN users ON posts.user_id = users.id;
+## 6. Database
 
--- where is ambiguity, use the table in front
-SELECT post.id, users.emai
-FROM posts -- the left table
-RIGHT JOIN users -- the right table
-ON posts.user_id = users.id;
+### 6.1 Get DB connection using psycopg2 and postgres
+Get DB connection using psycopg2 and postgres
+
+Example:
+
+```python
+from psycopg2.extras import RealDictCursor
+import psycopg2
+import time
+
+# connect to DB, without alchemy
+while True:
+    try:
+        conn = psycopg2.connect(
+            host="localhost",
+            database="fastapi",
+            user="postgres",
+            password="postgres",
+            cursor_factory=RealDictCursor,
+        )
+        cursor = conn.cursor()
+        print("Database connection succesfull!")
+        break
+    except Exception as error:
+        print("Database connection failed")
+        time.sleep(2)
 ```
 
-## group by
-```sql
-SELECT users.id, COUNT(*)
-FROM posts -- the left table
-LEFT JOIN users -- the right table
-ON posts.user_id = users.id
-group by users.id;
+### 6.2 Fastapi DB Queries using psycopg2
 
-
-SELECT users.id, COUNT(posts.id)
-FROM posts
-RIGHT JOIN users
-ON posts.user_id = users.id
-group by users.id;
-```
-
-
-## join
-```sql
-SELECT posts.id, COUNT(votes.id) as likes
-FROM posts
-LEFT JOIN votes
-ON posts.id = votes.post_id;
-GROUP BY posts.id
-
-```
-
-- Alembic, DB migration tool
-# keep track incremental changes on DB
-
-```sh
-pip install alembic
-
-alembic init alembic
-# creates a file with the sql statements that we want to apply
-alembic revision -m "create post table"+
-
-alembic revision <my_revision>
-alembic downgrade -1
-alembic upgrade 
-
+- Example, get all posts (select all posts)
+```python
+@router.get("/", response_model=List[schemas.Post])
+def get_posts(
+    limit: int = 10,
+    skip: int = 1,
+    search: Optional[str] = "",
+):
+    # DB version
+    cursor.execute("""SELECT * FROM posts """)
+    posts = cursor.fetchall()
 
 ```
 
-# requirements dump and install
+- Example, get all posts with where condition
+```python
+@router.get("/", response_model=List[schemas.Post])
+def get_posts(
+    db: Session = Depends(get_db),
+    limit: int = 10,
+    skip: int = 1,
+    search: Optional[str] = "",
+):
+    # DB version
+    cursor.execute("""SELECT * FROM posts """)
+    posts = cursor.fetchall()
 
-## requirements dump
+```
+
+- Example, insert a post
+```python
+    cursor.execute(
+        """INSERT INTO posts (title, content, published) VALUES (%s, %s, %s) RETURNING *""",
+        (post.title, post.content, post.published),
+    )
+    new_post = cursor.fetchone()
+    conn.commit()
+```
+
+- Example, delete a post
+```python
+    # DB version
+    cursor.execute(
+        """DELETE FROM posts WHERE id = %s  RETURNING *""",
+        (str(id)),
+    )
+    deleted_post = cursor.fetchone()
+    conn.commit()
+```
+
+- Example, update a post
+```python
+    # DB version
+    cursor.execute(
+        """UPDATE posts SET title = %s, content = %s, published = %s WHERE id = %s RETURNING * """,
+        post.title,
+        post.content,
+        post.published,
+        str(id),
+    )
+    updated_post = cursor.fetchone()
+    conn.commit()
+```
+
+## 7. JWT with fastapi
+
+- Required lib:
+
+1. Lib for hashing passwords, the hashed password will be stored in the DB
+```cmd
+pip install passlib[bcrypt]
+```
+
+2. Lib for jwt encoding/decoding, used for creation and verification of the token
+ ```python
+pip install python-jose[cryptography]
+```
+
+Access token creation and verification, retrieved by performing a POST on \login resource (username and password):
+
+```python
+from app import schemas
+from datetime import datetime, timedelta
+from fastapi import Depends, status, HTTPException
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
+from sqlalchemy.orm import Session
+
+from . import database, models, config
+from .config import settings
+
+# api that performs the authentication
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+
+
+# secret key
+# algorithm
+# expiration time
+SECRET_KEY = settings.secret_key
+ALGORITHM = settings.algorithm
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
+
+
+def create_access_token(data: dict):
+    # swallow copy
+    to_encode = data.copy()
+
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+    return encoded_jwt
+
+
+def verify_access_token(token: str, credentials_exception):
+    try:
+        # payload decode
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        print(payload)
+        # extract id from the payload
+        id: str = payload.get("user_id")
+
+        if id is None:
+            raise credentials_exception
+        token_data = schemas.TokenData(id=id)
+    except JWTError:
+        raise credentials_exception
+    return token_data
+
+
+def get_current_user(
+    token: str = Depends(oauth2_scheme), db: Session = Depends(database.get_db)
+):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail=f"could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    token = verify_access_token(token, credentials_exception)
+    user = db.query(models.User).filter(models.User.id == token.id).first()
+    return user
+
+```
+
+
+## 8. install libs through requirements.txt
+
+### 8.1 requirements dump
+```cmd
 pip freeze > requirements.txt
+```
 
-## requirements install
+### 8.2 requirements install
+```cmd
 pip install -r requirements.txt
+```
 
-# Docker
+## 9. app dockerization
 
+### 9.1 Dockerfile
 
-## Dockerfile
+Example:
 
 ```Dockerfile
 FROM python:3.9.7
@@ -424,7 +567,7 @@ CMD ["uvicorn". "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 docker build -t fastapi .
 ```
 
-# docker-compose.yml
+### 9.2 docker-compose.yml
 
 ```yml
 version: "3"
@@ -454,51 +597,107 @@ services:
 
 volumes: 
     - postgres-db:
-
 ```
 
+### 9.3 docker compose useful commands
 ```sh
 docker compose up
 docker compose down
 docker exec -it fastapi_api bash
 ```
 
+## 10. postgres queries examples
 
+### left join
+```sql
+select * from posts LEFT JOIN users ON posts.user_id = users.id;
+select content, email, title from posts LEFT JOIN users ON posts.user_id = users.id;
+
+-- where is ambiguity, use the table in front
+SELECT post.id, users.emai
+FROM posts -- the left table
+LEFT JOIN users -- the right table
+ON posts.user_id = users.id;
+```
+
+### right join
+```sql
+select * from posts RIGHT JOIN users ON posts.user_id = users.id;
+select content, email, title from posts RIGHT JOIN users ON posts.user_id = users.id;
+
+-- where is ambiguity, use the table in front
+SELECT post.id, users.emai
+FROM posts -- the left table
+RIGHT JOIN users -- the right table
+ON posts.user_id = users.id;
+```
+
+### group by
+```sql
+SELECT users.id, COUNT(*)
+FROM posts -- the left table
+LEFT JOIN users -- the right table
+ON posts.user_id = users.id
+group by users.id;
+
+
+SELECT users.id, COUNT(posts.id)
+FROM posts
+RIGHT JOIN users
+ON posts.user_id = users.id
+group by users.id;
+```
+
+
+### join
+
+
+
+```sql
+SELECT posts.id, COUNT(votes.id) as likes
+FROM posts
+LEFT JOIN votes
+ON posts.id = votes.post_id;
+GROUP BY posts.id
+
+```
+
+- Alembic, DB migration tool
+# keep track incremental changes on DB
 
 ```sh
 pip install pytest
 ```
-
-
 # pytest
-
 - auto-discovery
   - test_calculations.py
-
 running on verbose mode
 ```sh
 pytest -v
-```
-
+``
 - print statements are visible, -s option
-
 ```sh
 pytest -v -s 
 ```
-
 - fixtures, you can avoid repetitive code
-
 - test specific tests
 ```sh
 pytest -v -s tests/test_users.py
 ```
-
 stop at the first failure
 ```sh
 pytest -x
 ```
-
 - fixture scopes! are run for each function, runs for each function
-
 - whatever fixture is in the conftest.py is automatically available to all modules,
   no need to import explicitly
+
+```sh
+pip install alembic
+alembic init alembic
+# creates a file with the sql statements that we want to apply
+alembic revision -m "create post table"+
+alembic revision <my_revision>
+alembic downgrade -1
+alembic upgrade 
+```
