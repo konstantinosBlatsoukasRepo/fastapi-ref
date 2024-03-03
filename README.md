@@ -50,77 +50,6 @@ pip install fastapi[all]
 pip freeze
 ```
 
-
-
-- order of the url matters!
-- schema validation: pydantic
-
-/posts
-/posts/:id
-/posts
-
-- how to set default http status
-```python 
-@app.post("/pydantic/posts", status_code=status.HTTP_201_CREATED)
-def create_posts(post: Post):
-```
-
-- in order to create a package to the following:
-
-1. create a new folder
-2. in the new folder, create a file named "__init__.py"
-
-
-
-```sql
-SELECT name FROM products;
-SELECT name, id FROM products;
-SELECT name, id AS produt_id FROM products;
-
--- operators
-SELECT name, id AS produt_id FROM products WHERE id = 2;
-SELECT name, id AS produt_id FROM products WHERE id = 2 or id = 4;
-SELECT name, id AS produt_id FROM products WHERE id >= 2;
-SELECT name, id AS produt_id FROM products WHERE id != 2;
-
--- logical ops
-SELECT name, id AS produt_id FROM products WHERE id != 2 AND id > 0;
-SELECT name, id AS produt_id FROM products WHERE id != 2 OR id > 0;
-
--- IN op
-SELECT name, id AS produt_id FROM products WHERE id IN (1, 2, 4);
-
--- LIKE op
-SELECT *  FROM products WHERE name LIKE 'TV%';
-SELECT *  FROM products WHERE name NOT LIKE 'TV%';
-
--- ORDER BY
-SELECT *  FROM products ORDER BY price ASC;
-SELECT *  FROM products ORDER BY price DESC;
-
--- LIMIT
-SELECT *  FROM products LIMIT 10;
-
--- SKIPS THE FIRST 20
-SELECT * FROM customers LIMIT 10 OFFSET 20;
-
--- INSERT
-INSERT INTO products (name, price, inventory) VALUES ('tortilla', 4, 1000);
-
--- INSERT with returning values
-INSERT INTO products (name, price, inventory) VALUES ('car', 4, 10002), ('laptop', 3, 500) returning id;
-
--- DELETE
-DELETE FROM products WHERE ....
-
--- UPDATE
-UPDATE products SET name = 'flour tortilla', price = 40 WHERE id = 2
-
--- BATCH UPDATE
-UPDATE products SET name = 'flour tortilla', price = 40
-
-```
-
 ## 3. Validation with pydantic
 
 ### 3.1 Schema definition
@@ -647,6 +576,53 @@ RIGHT JOIN users
 ON posts.user_id = users.id
 group by users.id;
 ```
+
+```sql
+SELECT name FROM products;
+SELECT name, id FROM products;
+SELECT name, id AS produt_id FROM products;
+
+-- operators
+SELECT name, id AS produt_id FROM products WHERE id = 2;
+SELECT name, id AS produt_id FROM products WHERE id = 2 or id = 4;
+SELECT name, id AS produt_id FROM products WHERE id >= 2;
+SELECT name, id AS produt_id FROM products WHERE id != 2;
+
+-- logical ops
+SELECT name, id AS produt_id FROM products WHERE id != 2 AND id > 0;
+SELECT name, id AS produt_id FROM products WHERE id != 2 OR id > 0;
+
+-- IN op
+SELECT name, id AS produt_id FROM products WHERE id IN (1, 2, 4);
+
+-- LIKE op
+SELECT *  FROM products WHERE name LIKE 'TV%';
+SELECT *  FROM products WHERE name NOT LIKE 'TV%';
+
+-- ORDER BY
+SELECT *  FROM products ORDER BY price ASC;
+SELECT *  FROM products ORDER BY price DESC;
+
+-- LIMIT
+SELECT *  FROM products LIMIT 10;
+
+-- SKIPS THE FIRST 20
+SELECT * FROM customers LIMIT 10 OFFSET 20;
+
+-- INSERT
+INSERT INTO products (name, price, inventory) VALUES ('tortilla', 4, 1000);
+
+-- INSERT with returning values
+INSERT INTO products (name, price, inventory) VALUES ('car', 4, 10002), ('laptop', 3, 500) returning id;
+
+-- DELETE
+DELETE FROM products WHERE ....
+
+-- UPDATE
+UPDATE products SET name = 'flour tortilla', price = 40 WHERE id = 2
+
+-- BATCH UPDATE
+UPDATE products SET name = 'flour tortilla', price = 40
 
 
 ### join
